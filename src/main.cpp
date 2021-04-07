@@ -1,6 +1,5 @@
 #include <Arduino.h>
 
-#include "FastLED.h"
 #include "IRremote.h"
 #include "Setup.h"
 
