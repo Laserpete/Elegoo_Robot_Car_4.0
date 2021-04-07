@@ -1,52 +1,8 @@
 #include <Arduino.h>
 
+#include "FastLED.h"
 #include "IRremote.h"
-
-#define IR_RECEIVE_PIN 9
-
-// Moving forwards
-#define CALIBRATION_TIME 2
-#define CALIBRATION_AT_PWM_100 75
-#define CALIBRATION_AT_PWM_255 188
-
-// Turning on the spot
-#define TURN_LR_PWM 125
-// The gradient determined by the turning on the spot linear regression
-// PWM = 125
-// f(x) == 248 x - 40
-// f(x) + 40 == 248 x
-// f(x) + 40 / 248 == x
-// f(x) = a x -b
-#define TURN_SPOT_F_OF_X_A 0.248
-#define TURN_SPOT_F_OF_X_B 40
-
-// Driving forward and back trim
-#define FORWARD_STEERING_TRIM 0
-#define BACKWARD_STEERING_TRIM 20
-// IR Control turn amount in degrees
-#define IR_TURN_MAGNITUDE_DEGREES 20
-
-#define MILLISECONDS 1000
-
-// IR control commands on NEC protocol in HEX
-
-#define IR_FORWARD 0x46
-#define IR_BACKWARD 0x15
-#define IR_LEFT 0x44
-#define IR_RIGHT 0x43
-#define IR_OK 0x40
-#define IR_1 0x16
-#define IR_2 0x19
-#define IR_3 0xD
-#define IR_4 0xC
-#define IR_5 0x18
-#define IR_6 0x5E
-#define IR_7 0x8
-#define IR_8 0x1C
-#define IR_9 0x5A
-#define IR_0 0x52
-#define IR_ASTERISK 0x42
-#define IR_HASH 0x4A
+#include "Setup.h"
 
 int AIN1 = 8;  // direction low = forward
 int AIN2 = 5;  // speed PWM
@@ -57,6 +13,9 @@ int leftSpeed;
 int rightSpeed;
 int wheelPWM;
 float CMpS;
+
+// Variables for the adjustable IR controlled speed/distance
+int IrDriveDistance, IrDriveSpeed = 50;
 
 // Use calibration definitions to calculate gradient for PWM : CM per second
 float speed100 = CALIBRATION_AT_PWM_100 / CALIBRATION_TIME;  // speed at PWM 100
@@ -197,16 +156,17 @@ int calculateMaximumSpeed(int CMpS) {
 void IrControlInterpreter() {
   IrReceiver.printIRResultShort(&Serial);
   int IrCommand = IrReceiver.decodedIRData.command;
-  IrReceiver.resume();
 
   switch (IrCommand) {
     case IR_FORWARD:
-      forward(25, 50);
+      forward(IrDriveDistance, IrDriveSpeed);
+      Serial.println(F("IR_FORWARD"));
       stopCar();
       break;
 
     case IR_BACKWARD:
-      backward(25, 50);
+      backward(IrDriveDistance, IrDriveSpeed);
+      Serial.println(F("IR_BACKWARD"));
       stopCar();
       break;
 
@@ -220,20 +180,97 @@ void IrControlInterpreter() {
       stopCar();
       break;
 
-    case IR_0:
-    case IR_1:
-    case IR_2:
-    case IR_3:
-    case IR_4:
-    case IR_5:
-    case IR_6:
-    case IR_7:
-    case IR_8:
-    case IR_9:
     case IR_ASTERISK:
+      Serial.println("IR_ASTERISK");
+      delay(250);
+      IrReceiver.resume();
+      while (IrReceiver.decode() == 0) {
+        ;
+      }
+      IrCommand = IrReceiver.decodedIRData.command;
+      switch (IrCommand) {
+        case IR_0:
+          IrDriveSpeed = IR_DRIVE_SPEED_INCREMENT;
+          Serial.println("IR_0");
+          break;
+        case IR_1:
+          IrDriveSpeed = 2 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_2:
+          IrDriveSpeed = 3 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_3:
+          IrDriveSpeed = 4 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_4:
+          IrDriveSpeed = 5 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_5:
+          IrDriveSpeed = 6 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_6:
+          IrDriveSpeed = 7 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_7:
+          IrDriveSpeed = 8 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_8:
+          IrDriveSpeed = 9 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+        case IR_9:
+          IrDriveSpeed = 10 * IR_DRIVE_SPEED_INCREMENT;
+          break;
+      }
+      Serial.print("IR Drive Speed =");
+      Serial.println(IrDriveSpeed);
+      break;
+
     case IR_HASH:
+      Serial.println("IR_HASH");
+      delay(250);
+      IrReceiver.resume();
+      while (IrReceiver.decode() == 0) {
+        ;
+      }
+      IrCommand = IrReceiver.decodedIRData.command;
+      switch (IrCommand) {
+        case IR_0:
+          IrDriveDistance = IR_DRIVE_DISTANCE_INCREMENT;
+          Serial.println("IR_0");
+          break;
+        case IR_1:
+          IrDriveDistance = 2 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_2:
+          IrDriveDistance = 3 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_3:
+          IrDriveDistance = 4 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_4:
+          IrDriveDistance = 5 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_5:
+          IrDriveDistance = 6 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_6:
+          IrDriveDistance = 7 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_7:
+          IrDriveDistance = 8 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_8:
+          IrDriveDistance = 9 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+        case IR_9:
+          IrDriveDistance = 10 * IR_DRIVE_DISTANCE_INCREMENT;
+          break;
+      }
+      Serial.print("IR Drive Distance =");
+      Serial.println(IrDriveDistance);
       break;
   }
+  IrReceiver.resume();
 }
 
 void loop() {
