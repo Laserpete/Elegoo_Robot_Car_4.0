@@ -38,7 +38,9 @@ void setup() {
                    "\r\nUsing IR Remote library version " VERSION_IRREMOTE));
 
   IrDriveSpeedMax = (m * 255) - (m * 100) + speed100;
+  Serial.println(IrDriveSpeedMax);
   IrDriveSpeedMin = (m * 100) - (m * 100) + speed100;
+  Serial.println(IrDriveSpeedMin);
 }
 
 int calcWheelPWM(float desiredVelocity) {
@@ -229,8 +231,7 @@ void IrControlInterpreter() {
           break;
       }
 
-      IrDriveSpeed =
-          IrDriveSpeedMin + ((IrDriveSpeedMax / 9) * IrDriveSpeedSelect);
+      IrDriveSpeed = (6.33 * IrDriveSpeedSelect) + 37;
 
       Serial.print("IR Drive Speed = ");
       Serial.println(IrDriveSpeed);
