@@ -14,7 +14,8 @@ int wheelPWM;
 float CMpS;
 
 // Variables for the adjustable IR controlled speed/distance
-int IrDriveDistance, IrDriveSpeed = 50;
+int IrDriveDistance = 50;
+int IrDriveSpeedMin, IrDriveSpeedMax, IrDriveSpeed;
 
 // Use calibration definitions to calculate gradient for PWM : CM per second
 float speed100 = CALIBRATION_AT_PWM_100 / CALIBRATION_TIME;  // speed at PWM 100
@@ -23,6 +24,8 @@ float m = (speed225 - speed100) / 155;  // (speed225 - speed100) / 255 - 100
 
 void setup() {
   Serial.begin(115200);
+
+  IrReceiver.begin(IR_RECEIVE_PIN, false);
   while (!Serial) {
     ;
   }
@@ -33,7 +36,9 @@ void setup() {
   pinMode(AIN2, OUTPUT);
   Serial.println(F("START " __FILE__ " from "__DATE__
                    "\r\nUsing IR Remote library version " VERSION_IRREMOTE));
-  IrReceiver.begin(IR_RECEIVE_PIN, false);
+
+  IrDriveSpeedMax = (m * 255) - (m * 100) + speed100;
+  IrDriveSpeedMin = (m * 100) - (m * 100) + speed100;
 }
 
 int calcWheelPWM(float desiredVelocity) {
@@ -180,52 +185,59 @@ void IrControlInterpreter() {
       break;
 
     case IR_ASTERISK:
-      Serial.println("IR_ASTERISK");
+      Serial.println("IR_ASTERISK, set IR speed");
       delay(250);
       IrReceiver.resume();
       while (IrReceiver.decode() == 0) {
         ;
       }
       IrCommand = IrReceiver.decodedIRData.command;
+      int IrDriveSpeedSelect;
       switch (IrCommand) {
         case IR_0:
-          IrDriveSpeed = IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 0;
           Serial.println("IR_0");
           break;
         case IR_1:
-          IrDriveSpeed = 2 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 1;
           break;
         case IR_2:
-          IrDriveSpeed = 3 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 2;
           break;
         case IR_3:
-          IrDriveSpeed = 4 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 3;
           break;
         case IR_4:
-          IrDriveSpeed = 5 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 4;
           break;
         case IR_5:
-          IrDriveSpeed = 6 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 5;
           break;
         case IR_6:
-          IrDriveSpeed = 7 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 6;
           break;
         case IR_7:
-          IrDriveSpeed = 8 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 7;
           break;
         case IR_8:
-          IrDriveSpeed = 9 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 8;
           break;
         case IR_9:
-          IrDriveSpeed = 10 * IR_DRIVE_SPEED_INCREMENT;
+          IrDriveSpeedSelect = 9;
+          break;
+        default:
           break;
       }
-      Serial.print("IR Drive Speed =");
+
+      IrDriveSpeed =
+          IrDriveSpeedMin + ((IrDriveSpeedMax / 9) * IrDriveSpeedSelect);
+
+      Serial.print("IR Drive Speed = ");
       Serial.println(IrDriveSpeed);
       break;
 
     case IR_HASH:
-      Serial.println("IR_HASH");
+      Serial.println("IR_HASH, set IR Distance");
       delay(250);
       IrReceiver.resume();
       while (IrReceiver.decode() == 0) {
@@ -264,8 +276,10 @@ void IrControlInterpreter() {
         case IR_9:
           IrDriveDistance = 10 * IR_DRIVE_DISTANCE_INCREMENT;
           break;
+        default:
+          break;
       }
-      Serial.print("IR Drive Distance =");
+      Serial.print("IR Drive Distance = ");
       Serial.println(IrDriveDistance);
       break;
   }
@@ -278,20 +292,7 @@ void loop() {
   if (IrReceiver.decode()) {
     IrControlInterpreter();
   }
-  /*
-  IrReceiver.printIRResultShort(&Serial);
-  Serial.println(IrReceiver.decodedIRData.command, HEX);
-  Serial.println();
-  IrReceiver.resume();
 
-  if (IrReceiver.decodedIRData.command == 0x10) {
-    Serial.println("Do something");
-  } else if (IrReceiver.decodedIRData.command == 0x11) {
-    Serial.println("Do something else");
-  }
-}
-delay(500);
-*/
   /*
   leftSpeed = 100;
   rightSpeed = 100;
@@ -311,12 +312,3 @@ delay(500);
   CMpS = calculateMaximumSpeed(CMpS);
   wheelPWM = calcWheelPWM(CMpS);
 }
-/*
-  forward(50, 50);
-  turnRight(180);
-  forward(50, 25);
-  turnLeft(180);
-  stopCar(1);
-  while (1)
-    ;
-}*/
