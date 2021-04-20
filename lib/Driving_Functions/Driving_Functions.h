@@ -23,9 +23,6 @@
 #define TURN_SPOT_F_OF_X_A 0.248
 #define TURN_SPOT_F_OF_X_B 40
 
-// Driving forward and back trim
-#define FORWARD_STEERING_TRIM 0
-#define BACKWARD_STEERING_TRIM 0
 // IR Control turn amount in degrees
 #define IR_TURN_MAGNITUDE_DEGREES 20
 
@@ -77,6 +74,9 @@
 
 #define UART_DRIVE_DISTANCE_INCREMENT 10
 
+#define ULTRASONIC_TRIGGER_PIN 13
+#define ULTRASONIC_ECHO_PIN 12
+
 void setupIrReceiver();
 void setupDrivingPins();
 void calculateCalibration();
@@ -97,3 +97,6 @@ void calR();
 int calculateMaximumSpeed(int);
 void UARTHash();
 void UARTAsterisk();
+int ultrasonicPingDistance();
+void setupUltrasonic();
+void avoid();

@@ -11,16 +11,22 @@ float CMpS;
 
 // Variables for the adjustable IR controlled speed/distance
 int IrDriveDistance = 50;
-int IrDriveSpeedMin, IrDriveSpeedMax, IrDriveSpeed;
+int IrDriveSpeed = 100;
+int IrDriveSpeedMin, IrDriveSpeedMax;
 
-int UARTDriveDistance = 50;
-int UARTDriveSpeedMin, UARTDriveSpeedMax, UARTDriveSpeed;
+int UARTDriveDistance = 500;
+int UARTDriveSpeed = 100;
+int UARTDriveSpeedMin, UARTDriveSpeedMax;
 
 // Use calibration definitions to calculate gradient for PWM : CM per second
 float speed100 = CALIBRATION_AT_PWM_100 / CALIBRATION_TIME;  // speed at PWM 100
 float speed225 = CALIBRATION_AT_PWM_255 / CALIBRATION_TIME;  // speed at PWM 255
 float m = (speed225 - speed100) / 155;  // (speed225 - speed100) / 255 - 100
 
+void setupUltrasonic() {
+  pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+  pinMode(ULTRASONIC_TRIGGER_PIN, OUTPUT);
+}
 void setupDrivingPins() {
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
@@ -63,37 +69,83 @@ void stopCar() {
   digitalWrite(AIN2, LOW);
   digitalWrite(BIN2, LOW);
 }
-void forward(int d, float velocity) {
-  // Set wheel turning direction
-  digitalWrite(AIN1, LOW);
-  digitalWrite(BIN1, HIGH);
 
-  // Calculate wheel PWM value and et steering trim
+int ultrasonicPingDistance() {
+  unsigned int pingTravelTime;
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, HIGH);
+  delayMicroseconds(20);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  pingTravelTime = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  // speed of sound divided by time = distance of object
+  // speed of sound in air = 343 meters per second at 20 C
+  // or 34300 CM per second
+  // or 34.3 CM per milisecond
+  // or 0.0343 CM per microsecond
 
-  leftSpeed = rightSpeed = calcWheelPWM(velocity);
-  rightSpeed = leftSpeed - FORWARD_STEERING_TRIM;
+  unsigned int pingDistance = (pingTravelTime * 0.0343) / 2;
 
-  // Set wheel PWM values
-  analogWrite(AIN2, leftSpeed);
-  analogWrite(BIN2, rightSpeed);
-
-  // Calculate time to drive
-  float t = d / velocity;
-  delay(t * 1000);
-  stopCar();
+  return pingDistance;
 }
 
+void avoid() {
+  Serial.println("Avoid");
+  turnRight(90);
+  Serial.println("Right");
+  forward(50, 100);
+  turnLeft(90);
+  Serial.println("Left");
+  forward(50, 100);
+  turnLeft(90);
+  Serial.println("Left");
+  forward(50, 100);
+  turnRight(90);
+  Serial.println("Right, back on course");
+  stopCar();
+}
+void forward(int d, float velocity) {
+  // Calculate time to drive
+  float targetDriveTime = d / velocity * 1000;
+
+  int timeDriven = 0;
+  int startTime = millis();
+  int distanceToObstacle = ultrasonicPingDistance();
+  bool carBlocked = false;
+  int t1, t2, tStopped;
+  timeDriven = millis() - startTime;
+  while (timeDriven <= targetDriveTime) {
+    timeDriven = millis() - startTime;
+    distanceToObstacle = ultrasonicPingDistance();
+    digitalWrite(AIN1, LOW);
+    digitalWrite(BIN1, HIGH);
+    analogWrite(AIN2, velocity);
+    analogWrite(BIN2, velocity);
+    // Serial.print("Ultrasonic Ping Distance = ");
+    // Serial.print(distanceToObstacle);
+    t1 = millis();
+    if (distanceToObstacle <= 5) {
+      avoid();
+      carBlocked = true;
+    }
+    t2 = millis();
+    if (carBlocked == true) {
+      tStopped = tStopped + (t2 + t1);
+      carBlocked = false;
+      digitalWrite(AIN1, LOW);
+      digitalWrite(BIN1, HIGH);
+      analogWrite(AIN2, velocity);
+      analogWrite(BIN2, velocity);
+    }
+  }
+}
 void backward(int d, float velocity) {
   digitalWrite(AIN1, HIGH);
   digitalWrite(BIN1, LOW);
 
-  // Calculate wheel PWM value and et steering trim
-  leftSpeed = rightSpeed = calcWheelPWM(velocity);
-  rightSpeed = leftSpeed + BACKWARD_STEERING_TRIM;
-
   // Set wheel PWM values
-  analogWrite(AIN2, leftSpeed);
-  analogWrite(BIN2, rightSpeed);
+  analogWrite(AIN2, velocity);
+  analogWrite(BIN2, velocity);
 
   // Calculate time to drive
   float t = d / velocity;
@@ -413,8 +465,10 @@ void UARTControlInterpreter() {
 
     case UART_ASTERISK:
       UARTAsterisk();
+      break;
 
     case UART_HASH:
       UARTHash();
+      break;
   }
 }

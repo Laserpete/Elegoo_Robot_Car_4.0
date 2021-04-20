@@ -2,6 +2,3 @@
 // RGB LED
 #define PIN_RBGLED 4
 #define NUM_LEDS 1
-
-#define ULTRASONIC_TRIGGER_PIN 13
-#define ULTRASONIC_ECHO_PIN 12
