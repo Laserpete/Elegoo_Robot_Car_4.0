@@ -1,333 +1,100 @@
 #include <Arduino.h>
 
-#include "IRremote.h"
+#include "Driving_Functions.h"
+#include "FastLED.h"
 #include "Setup.h"
 
-int AIN1 = 8;  // direction low = forward
-int AIN2 = 5;  // speed PWM
-int BIN1 = 7;  // direction high = forward
-int BIN2 = 6;  // speed PWM
+CRGB leds[NUM_LEDS];
 
-int leftSpeed;
-int rightSpeed;
-int wheelPWM;
-float CMpS;
+float calibratedSpeedOfSound;
 
-// Variables for the adjustable IR controlled speed/distance
-int IrDriveDistance = 50;
-int IrDriveSpeedMin, IrDriveSpeedMax, IrDriveSpeed;
+int calibrateUltrasonic() {
+  // Calibration. Distance / Time = speed.
+  long pingTravelTime, speedOfSound;
+  long calibrationDistance = 30;
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, HIGH);
+  delayMicroseconds(20);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  pingTravelTime = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  Serial.print("pingTravelTime = ");
+  Serial.println(pingTravelTime);
 
-// Use calibration definitions to calculate gradient for PWM : CM per second
-float speed100 = CALIBRATION_AT_PWM_100 / CALIBRATION_TIME;  // speed at PWM 100
-float speed225 = CALIBRATION_AT_PWM_255 / CALIBRATION_TIME;  // speed at PWM 255
-float m = (speed225 - speed100) / 155;  // (speed225 - speed100) / 255 - 100
+  speedOfSound = (calibrationDistance * 1000000) / pingTravelTime;
+  Serial.print("Calibrated Speed of sound = ");
+  Serial.println(speedOfSound);
+  return speedOfSound;
+}
 
 void setup() {
-  Serial.begin(9600);
-
-  IrReceiver.begin(IR_RECEIVE_PIN, false);
-  while (!Serial) {
-    ;
-  }
+  Serial.begin(115200);
+  setupDrivingPins();
+  setupIrReceiver();
+  calculateCalibration();
+  pinMode(ULTRASONIC_ECHO_PIN, INPUT);
+  pinMode(ULTRASONIC_TRIGGER_PIN, OUTPUT);
+  calibratedSpeedOfSound = calibrateUltrasonic();
   Serial.println("IR Receiver Begin");
-  pinMode(AIN1, OUTPUT);
-  pinMode(AIN2, OUTPUT);
-  pinMode(AIN1, OUTPUT);
-  pinMode(AIN2, OUTPUT);
-  Serial.println(F("START " __FILE__ " from "__DATE__
-                   "\r\nUsing IR Remote library version " VERSION_IRREMOTE));
 
-  IrDriveSpeedMax = (m * 255) - (m * 100) + speed100;
-  Serial.println(IrDriveSpeedMax);
-  IrDriveSpeedMin = (m * 100) - (m * 100) + speed100;
-  Serial.println(IrDriveSpeedMin);
+  // Serial.println(F("START " __FILE__ " from "__DATE__
+  //                  "\r\nUsing IR Remote library version " VERSION_IRREMOTE));
+
+  FastLED.addLeds<NEOPIXEL, PIN_RBGLED>(leds, NUM_LEDS);
+  FastLED.setBrightness(20);
 }
 
-int calcWheelPWM(float desiredVelocity) {
-  int calculatedPWM = desiredVelocity / m + (m * 100) - speed100;
-  return calculatedPWM;
+int pingDistance() {
+  int pingTravelTime;
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, HIGH);
+  delayMicroseconds(20);
+  digitalWrite(ULTRASONIC_TRIGGER_PIN, LOW);
+  pingTravelTime = pulseIn(ULTRASONIC_ECHO_PIN, HIGH);
+  // speed of sound divided by time = distance of object
+  // speed of sound in air = 343 meters per second at 20 C
+  // or 34300 CM per second
+  // or 34.3 CM per milisecond
+  // or 0.0343 CM per microsecond
+
+  float pingDistance = pingTravelTime * (calibratedSpeedOfSound / 1000000);
+
+  return pingDistance;
 }
 
-void setSpeed(int leftVal, int rightVal) {
-  analogWrite(AIN2, leftVal);
-  analogWrite(BIN2, rightVal);
+uint32_t Colour(uint8_t r, uint8_t g, uint8_t b) {
+  return (((uint32_t)r << 16) | ((uint32_t)g << 8) | b);
 }
 
-int calculateRotationTime(int angle) {
-  int rotationTime = (angle + TURN_SPOT_F_OF_X_B) / TURN_SPOT_F_OF_X_A;
-  Serial.print("Rotation time for angle ");
-  Serial.print(angle);
-  Serial.print(" is ");
-  Serial.print(rotationTime);
-  return rotationTime;
-}
-void stopCar() {
-  digitalWrite(AIN2, LOW);
-  digitalWrite(BIN2, LOW);
-}
-void forward(int d, float velocity) {
-  // Set wheel turning direction
-  digitalWrite(AIN1, LOW);
-  digitalWrite(BIN1, HIGH);
-
-  // Calculate wheel PWM value and et steering trim
-
-  leftSpeed = rightSpeed = calcWheelPWM(velocity);
-  rightSpeed = leftSpeed - FORWARD_STEERING_TRIM;
-
-  // Set wheel PWM values
-  analogWrite(AIN2, leftSpeed);
-  analogWrite(BIN2, rightSpeed);
-
-  // Calculate time to drive
-  float t = d / velocity;
-  delay(t * 1000);
-  stopCar();
-}
-
-void backward(int d, float velocity) {
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(BIN1, LOW);
-
-  // Calculate wheel PWM value and et steering trim
-  leftSpeed = rightSpeed = calcWheelPWM(velocity);
-  rightSpeed = leftSpeed + BACKWARD_STEERING_TRIM;
-
-  // Set wheel PWM values
-  analogWrite(AIN2, leftSpeed);
-  analogWrite(BIN2, rightSpeed);
-
-  // Calculate time to drive
-  float t = d / velocity;
-  delay(t * MILLISECONDS);
-  stopCar();
-}
-
-void turnLeft(int angle) {
-  stopCar();
-  digitalWrite(AIN1, LOW);
-  digitalWrite(BIN1, LOW);
-  analogWrite(AIN2, TURN_LR_PWM);
-  analogWrite(BIN2, TURN_LR_PWM);
-  float rotationTime = calculateRotationTime(angle);
-  delay(rotationTime);
-  stopCar();
-}
-
-void turnRight(int angle) {
-  stopCar();
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(BIN1, HIGH);
-  analogWrite(AIN2, TURN_LR_PWM);
-  analogWrite(BIN2, TURN_LR_PWM);
-  float rotationTime = calculateRotationTime(angle);
-  delay(rotationTime);
-  stopCar();
-}
-
-void calF() {
-  digitalWrite(AIN1, LOW);
-  digitalWrite(BIN1, HIGH);
-  delay(CALIBRATION_TIME * MILLISECONDS);
-}
-
-void calB() {
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(BIN1, LOW);
-  delay(5000);
-}
-
-void calL(float d) {
-  digitalWrite(AIN1, LOW);
-  analogWrite(AIN2, 125);
-  digitalWrite(BIN1, LOW);
-  analogWrite(BIN2, 125);
-  delay(5000);
-}
-
-void calR() {
-  digitalWrite(AIN1, HIGH);
-  digitalWrite(BIN1, HIGH);
-  delay(5000);
-}
-
-int calculateMaximumSpeed(int CMpS) {
-  float maxCMpS = (m * 255) - (m * 100) + speed100;
-  if (CMpS >= maxCMpS) {
-    CMpS = maxCMpS;
-    Serial.print("Max velocity = ");
-    Serial.print(maxCMpS);
-    Serial.println("CM per Second");
-  }
-  return maxCMpS;
-}
-
-void IrControlInterpreter() {
-  IrReceiver.printIRResultShort(&Serial);
-  int IrCommand = IrReceiver.decodedIRData.command;
-
-  switch (IrCommand) {
-    case IR_FORWARD:
-      forward(IrDriveDistance, IrDriveSpeed);
-      Serial.println(F("IR_FORWARD"));
-      stopCar();
-      break;
-
-    case IR_BACKWARD:
-      backward(IrDriveDistance, IrDriveSpeed);
-      Serial.println(F("IR_BACKWARD"));
-      stopCar();
-      break;
-
-    case IR_LEFT:
-      turnLeft(IR_TURN_MAGNITUDE_DEGREES);
-      stopCar();
-      break;
-
-    case IR_RIGHT:
-      turnRight(IR_TURN_MAGNITUDE_DEGREES);
-      stopCar();
-      break;
-
-    case IR_ASTERISK:
-      Serial.println("IR_ASTERISK, set IR speed");
-      delay(250);
-      IrReceiver.resume();
-      while (IrReceiver.decode() == 0) {
-        ;
-      }
-      IrCommand = IrReceiver.decodedIRData.command;
-      int IrDriveSpeedSelect;
-      switch (IrCommand) {
-        case IR_0:
-          IrDriveSpeedSelect = 0;
-          Serial.println("IR_0");
-          break;
-        case IR_1:
-          IrDriveSpeedSelect = 1;
-          break;
-        case IR_2:
-          IrDriveSpeedSelect = 2;
-          break;
-        case IR_3:
-          IrDriveSpeedSelect = 3;
-          break;
-        case IR_4:
-          IrDriveSpeedSelect = 4;
-          break;
-        case IR_5:
-          IrDriveSpeedSelect = 5;
-          break;
-        case IR_6:
-          IrDriveSpeedSelect = 6;
-          break;
-        case IR_7:
-          IrDriveSpeedSelect = 7;
-          break;
-        case IR_8:
-          IrDriveSpeedSelect = 8;
-          break;
-        case IR_9:
-          IrDriveSpeedSelect = 9;
-          break;
-        default:
-          break;
-      }
-
-      IrDriveSpeed = (6.33 * IrDriveSpeedSelect) + 37;
-
-      Serial.print("IR Drive Speed = ");
-      Serial.println(IrDriveSpeed);
-      break;
-
-    case IR_HASH:
-      Serial.println("IR_HASH, set IR Distance");
-      delay(250);
-      IrReceiver.resume();
-      while (IrReceiver.decode() == 0) {
-        ;
-      }
-      IrCommand = IrReceiver.decodedIRData.command;
-      switch (IrCommand) {
-        case IR_0:
-          IrDriveDistance = IR_DRIVE_DISTANCE_INCREMENT;
-          Serial.println("IR_0");
-          break;
-        case IR_1:
-          IrDriveDistance = 2 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_2:
-          IrDriveDistance = 3 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_3:
-          IrDriveDistance = 4 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_4:
-          IrDriveDistance = 5 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_5:
-          IrDriveDistance = 6 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_6:
-          IrDriveDistance = 7 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_7:
-          IrDriveDistance = 8 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_8:
-          IrDriveDistance = 9 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        case IR_9:
-          IrDriveDistance = 10 * IR_DRIVE_DISTANCE_INCREMENT;
-          break;
-        default:
-          break;
-      }
-      Serial.print("IR Drive Distance = ");
-      Serial.println(IrDriveDistance);
-      break;
-  }
-  IrReceiver.resume();
-}
-
-void serialControl(void) {
-  char cmd = Serial.read();
-  if (cmd == 'F') {
-    forward(50, 50);
-  } else if (cmd == 'B') {
-    backward(50, 50);
-  } else if (cmd == 'L') {
-    turnLeft(20);
-  } else if (cmd == 'R') {
-    turnRight(20);
-  } else {
-    ;
-  }
-}
 void loop() {
   // Serial.println("This is working");
-  serialControl();
+  UARTControlInterpreter();
 
-  if (IrReceiver.decode()) {
-    IrControlInterpreter();
-  }
+  IrControlInterpreter();
 
-  /*
-  leftSpeed = 100;
-  rightSpeed = 100;
-
-  // Calculate wv from left+right speeds
-  wv = (((float)leftSpeed+(float)rightSpeed)/2);
-  Serial.print("wv =  ");
-  Serial.println(wv);
- */
-  // Calculate CM per second (v) for given PWM value (wv)
-  // v - v1 = m(wv-wv1)
-  // CMpS - speed100 = m(wv - 100)
-  // CMpS = m(wv - 100) + speed100
-
-  CMpS = 50;
-
-  CMpS = calculateMaximumSpeed(CMpS);
-  wheelPWM = calcWheelPWM(CMpS);
+  int pingD = pingDistance();
+  Serial.print("Ping distance = ");
+  Serial.print(pingD);
+  Serial.println(" Centimeters");
+  delay(500);
 }
+
+// CMpS = 50;
+
+// CMpS = calculateMaximumSpeed(CMpS);
+// wheelPWM = calcWheelPWM(CMpS);
+
+/*
+ leftSpeed = 100;
+ rightSpeed = 100;
+
+ // Calculate wv from left+right speeds
+ wv = (((float)leftSpeed+(float)rightSpeed)/2);
+ Serial.print("wv =  ");
+ Serial.println(wv);
+*/
+// Calculate CM per second (v) for given PWM value (wv)
+// v - v1 = m(wv-wv1)
+// CMpS - speed100 = m(wv - 100)
+// CMpS = m(wv - 100) + speed100
