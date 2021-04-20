@@ -23,7 +23,7 @@ float speed225 = CALIBRATION_AT_PWM_255 / CALIBRATION_TIME;  // speed at PWM 255
 float m = (speed225 - speed100) / 155;  // (speed225 - speed100) / 255 - 100
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
   IrReceiver.begin(IR_RECEIVE_PIN, false);
   while (!Serial) {
@@ -61,7 +61,10 @@ int calculateRotationTime(int angle) {
   Serial.print(rotationTime);
   return rotationTime;
 }
-
+void stopCar() {
+  digitalWrite(AIN2, LOW);
+  digitalWrite(BIN2, LOW);
+}
 void forward(int d, float velocity) {
   // Set wheel turning direction
   digitalWrite(AIN1, LOW);
@@ -79,6 +82,7 @@ void forward(int d, float velocity) {
   // Calculate time to drive
   float t = d / velocity;
   delay(t * 1000);
+  stopCar();
 }
 
 void backward(int d, float velocity) {
@@ -96,12 +100,9 @@ void backward(int d, float velocity) {
   // Calculate time to drive
   float t = d / velocity;
   delay(t * MILLISECONDS);
+  stopCar();
 }
 
-void stopCar() {
-  digitalWrite(AIN2, LOW);
-  digitalWrite(BIN2, LOW);
-}
 void turnLeft(int angle) {
   stopCar();
   digitalWrite(AIN1, LOW);
@@ -110,6 +111,7 @@ void turnLeft(int angle) {
   analogWrite(BIN2, TURN_LR_PWM);
   float rotationTime = calculateRotationTime(angle);
   delay(rotationTime);
+  stopCar();
 }
 
 void turnRight(int angle) {
@@ -120,6 +122,7 @@ void turnRight(int angle) {
   analogWrite(BIN2, TURN_LR_PWM);
   float rotationTime = calculateRotationTime(angle);
   delay(rotationTime);
+  stopCar();
 }
 
 void calF() {
@@ -287,8 +290,23 @@ void IrControlInterpreter() {
   IrReceiver.resume();
 }
 
+void serialControl(void) {
+  char cmd = Serial.read();
+  if (cmd == 'F') {
+    forward(50, 50);
+  } else if (cmd == 'B') {
+    backward(50, 50);
+  } else if (cmd == 'L') {
+    turnLeft(20);
+  } else if (cmd == 'R') {
+    turnRight(20);
+  } else {
+    ;
+  }
+}
 void loop() {
   // Serial.println("This is working");
+  serialControl();
 
   if (IrReceiver.decode()) {
     IrControlInterpreter();

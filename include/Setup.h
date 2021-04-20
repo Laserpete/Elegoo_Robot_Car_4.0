@@ -18,7 +18,7 @@
 
 // Driving forward and back trim
 #define FORWARD_STEERING_TRIM 0
-#define BACKWARD_STEERING_TRIM 20
+#define BACKWARD_STEERING_TRIM 0
 // IR Control turn amount in degrees
 #define IR_TURN_MAGNITUDE_DEGREES 20
 
@@ -44,7 +44,6 @@
 #define IR_ASTERISK 0x42
 #define IR_HASH 0x4A
 
-#define IR_DRIVE_SPEED_INCREMENT 9
 #define IR_DRIVE_DISTANCE_INCREMENT 10
 
 // RGB LED
