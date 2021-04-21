@@ -1,12 +1,5 @@
-
-
-#define AIN1 8  // direction low = forward
-#define AIN2 5  // speed PWM
-#define BIN1 7  // direction high = forward
-#define BIN2 6  // speed PWM
-
-#define IR_RECEIVE_PIN 9
-
+#ifndef DRIVING_FUNCTIONS_H
+#define DRIVING_FUNCTIONS_H
 // Moving forwards
 #define CALIBRATION_TIME 2
 #define CALIBRATION_AT_PWM_100 75
@@ -74,9 +67,6 @@
 
 #define UART_DRIVE_DISTANCE_INCREMENT 10
 
-#define ULTRASONIC_TRIGGER_PIN 13
-#define ULTRASONIC_ECHO_PIN 12
-
 void setupIrReceiver();
 void setupDrivingPins();
 void calculateCalibration();
@@ -100,3 +90,5 @@ void UARTAsterisk();
 int ultrasonicPingDistance();
 void setupUltrasonic();
 void avoid();
+
+#endif

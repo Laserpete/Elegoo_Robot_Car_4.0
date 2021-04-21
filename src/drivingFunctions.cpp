@@ -1,8 +1,9 @@
-#include "Driving_Functions.h"
+#include "drivingFunctions.h"
 
 #include <Arduino.h>
 
 #include "IRremote.h"
+#include "hardwareConfig.h"
 
 int leftSpeed;
 int rightSpeed;
@@ -39,6 +40,7 @@ void setupIrReceiver() {
   while (!Serial) {
     ;
   }
+  Serial.println("IR Receiver Begin");
 }
 
 void calculateCalibration() {

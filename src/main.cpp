@@ -1,8 +1,8 @@
 #include <Arduino.h>
 
-#include "Driving_Functions.h"
 #include "FastLED.h"
-#include "Setup.h"
+#include "drivingFunctions.h"
+#include "hardwareConfig.h"
 
 CRGB leds[NUM_LEDS];
 
@@ -11,8 +11,6 @@ void setup() {
   setupDrivingPins();
   setupIrReceiver();
   setupUltrasonic();
-
-  Serial.println("IR Receiver Begin");
 
   // Serial.println(F("START " __FILE__ " from "__DATE__
   //                  "\r\nUsing IR Remote library version " VERSION_IRREMOTE));
